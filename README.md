@@ -33,3 +33,7 @@ A retro-styled desktop music player with a Winamp aesthetic. Swamp Player suppor
    pyinstaller --noconfirm --onefile --windowed --icon "app/assets/icon.ico" --add-data "app/assets;app/assets" --version-file version_info.txt main.py
    ```
    *Once finished, the standalone file will be available in the `dist` folder as `main.exe`.*
+
+
+   <img width="1246" height="625" alt="{DF56E715-D4A2-497D-A6E4-65EA6FDFE3D5}" src="https://github.com/user-attachments/assets/9769c029-cb28-4616-b709-3a69eca1087a" />
+
