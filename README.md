@@ -1,4 +1,4 @@
-# Swamp Player
+# Swamp Player (W.I.P)
 
 A retro-styled desktop music player with a Winamp aesthetic. Swamp Player supports local history, playlists, and online streaming.
 
