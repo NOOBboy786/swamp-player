@@ -1,10 +1,10 @@
 # Swamp Player
 
-A retro-styled desktop music player with a Winamp aesthetic. Swamp Player supports local history, playlists, YouTube streaming, and iTunes API metadata fetching.
+A retro-styled desktop music player with a Winamp aesthetic. Swamp Player supports local history, playlists, and online streaming.
 
 ## Features
-- **YouTube Audio Streaming:** Instantly stream any song via yt-dlp.
-- **iTunes Metadata:** Automatically fetches high-quality album art and track information.
+- **Online Audio Streaming:** Instantly stream audio directly.
+- **Rich Metadata:** Automatically fetches high-quality album art and track information.
 - **Winamp Aesthetic:** Classic, nostalgic green-on-black interface with a 1:1 aspect ratio album art display.
 - **Portable:** Automatically downloads the required `mpv.exe` binary on first run, requiring no external setup.
 
