@@ -1,13 +1,19 @@
 # Swamp Player (W.I.P)
 
-A retro-styled desktop music player with a Winamp aesthetic. Swamp Player supports local history, playlists, and online streaming.
+A retro-styled desktop music player with a Winamp aesthetic.(vibecoded) Swamp Player supports local history, playlists, and online streaming.
 
 ## Features
 - **Online Audio Streaming:** Instantly stream audio directly.
 - **Rich Metadata:** Automatically fetches high-quality album art and track information.
 - **Winamp Aesthetic:** Classic, nostalgic green-on-black interface with a 1:1 aspect ratio album art display.
 - **Portable:** Automatically downloads the required `mpv.exe` binary on first run, requiring no external setup.
-
+## Features that dont work yet
+- **album** still doesnt work
+- **playback** can automatically stop sometimes
+- **autoplay** can bug out or crash the app fully
+## Features that i wanna add
+- **lyrics** Shows song lyrics
+- **more optimization** sudden spikes in cpu and mem usage
 ## How to Compile / Run from Source
 
 1. **Clone the repository:**
