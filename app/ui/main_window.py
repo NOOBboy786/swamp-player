@@ -25,6 +25,7 @@ class CavemanPlayer(QWidget):
     update_display_signal = Signal(str)
     update_art_signal = Signal(bytes)
     autoplay_track_signal = Signal(dict)
+    apply_album_tracks_signal = Signal(list)
     
     def __init__(self, base_dir):
         super().__init__()
@@ -73,6 +74,7 @@ class CavemanPlayer(QWidget):
         self.update_display_signal.connect(lambda txt: self.lbl_display.setText(txt))
         self.update_art_signal.connect(self._set_artwork)
         self.autoplay_track_signal.connect(self._on_autoplay_track)
+        self.apply_album_tracks_signal.connect(self._apply_album_tracks)
         
         self.mpv.signals.time_pos_changed.connect(self._update_time, Qt.QueuedConnection)
         self.mpv.signals.duration_changed.connect(self._update_duration, Qt.QueuedConnection)
@@ -355,16 +357,18 @@ class CavemanPlayer(QWidget):
         threading.Thread(target=fetch_and_play, daemon=True).start()
 
     def _play_full_album(self, album_id):
+        print(f"Album clicked: {album_id}")
         self.update_display_signal.emit("LOADING ALBUM...")
         
         def fetch_and_play():
             tracks = self.itunes.get_album_tracks(album_id)
             if not tracks:
+                print("Error: No tracks found for this album!")
                 self.update_display_signal.emit("ERROR: ALBUM NOT FOUND")
                 return
             
-            from PySide6.QtCore import QTimer
-            QTimer.singleShot(0, lambda: self._apply_album_tracks(tracks))
+            print(f"Found {len(tracks)} tracks for album {album_id}")
+            self.apply_album_tracks_signal.emit(tracks)
             
         import threading
         threading.Thread(target=fetch_and_play, daemon=True).start()
@@ -378,6 +382,8 @@ class CavemanPlayer(QWidget):
         self.is_autoplay_mode = True
         self.search_queue_window.update_queue_signal.emit()
         first_track = self.queue[0]
+        
+        print(f"Attempting to load stream for track: {first_track.get('title')} (ID: {first_track.get('id')})")
         self.load_and_play(first_track)
 
     def _set_artwork(self, image_data):
