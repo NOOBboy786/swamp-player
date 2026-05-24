@@ -7,13 +7,17 @@ A retro-styled desktop music player with a Winamp aesthetic.(vibecoded) Swamp Pl
 - **Rich Metadata:** Automatically fetches high-quality album art and track information.
 - **Winamp Aesthetic:** Classic, nostalgic green-on-black interface with a 1:1 aspect ratio album art display.
 - **Portable:** Automatically downloads the required `mpv.exe` binary on first run, requiring no external setup.
-## Features that dont work yet
+- **playlists:** You can drag and drop links and it will show the playlist content in a nutshell import online playlist
+
+- ## Features that dont work yet
 - **album** still doesnt work
 - **playback** can automatically stop sometimes
 - **autoplay** can bug out or crash the app fully
+
 ## Features that i wanna add
 - **lyrics** Shows song lyrics
 - **more optimization** sudden spikes in cpu and mem usage
+
 ## How to Compile / Run from Source
 
 1. **Clone the repository:**
