@@ -238,3 +238,41 @@ class Database:
             for idx, track_db_id in enumerate(track_db_ids_in_order):
                 cursor.execute('UPDATE playlist_tracks SET order_index = ? WHERE id = ?', (idx, track_db_id))
             conn.commit()
+
+    # --- Autoplay Recommendations ---
+    def get_smart_recommendations(self, artist, exclude_ids, limit=10):
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            placeholders = ','.join(['?'] * len(exclude_ids)) if exclude_ids else "''"
+            params = []
+            
+            history_query = f'''
+                SELECT track_id as id, title, artist, album, duration_ms, artwork_url
+                FROM history 
+                WHERE track_id NOT IN ({placeholders}) AND artist LIKE ?
+            '''
+            params.extend(exclude_ids)
+            params.append(f"%{artist}%")
+            
+            playlist_query = f'''
+                SELECT track_id as id, title, artist, album, duration_ms, artwork_url
+                FROM playlist_tracks
+                WHERE track_id NOT IN ({placeholders}) AND artist LIKE ?
+            '''
+            params.extend(exclude_ids)
+            params.append(f"%{artist}%")
+            
+            final_query = f'''
+                SELECT * FROM (
+                    {history_query}
+                    UNION
+                    {playlist_query}
+                )
+                ORDER BY RANDOM() LIMIT ?
+            '''
+            params.append(limit)
+            
+            cursor.execute(final_query, params)
+            return [dict(row) for row in cursor.fetchall()]

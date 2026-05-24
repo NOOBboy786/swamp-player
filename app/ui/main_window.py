@@ -1,5 +1,6 @@
 import os
 import threading
+import collections
 import requests
 from PySide6.QtWidgets import QWidget, QLabel, QDialog
 from PySide6.QtGui import QPainter, QMouseEvent, QPixmap, QImage, QColor, QIcon
@@ -44,6 +45,7 @@ class CavemanPlayer(QWidget):
         self.current_queue_idx = -1
         self.current_track = None
         self.is_autoplay_mode = False
+        self.session_played_ids = collections.deque(maxlen=100)
         self.repeat_mode = self.db.get_config('repeat_mode', 0)
         
         try:
@@ -317,6 +319,10 @@ class CavemanPlayer(QWidget):
             self.db.add_to_history(track)
             self.history_window.refresh_history()
             
+        track_id = track.get('id')
+        if track_id and track_id not in self.session_played_ids:
+            self.session_played_ids.append(track_id)
+            
         self.current_track = track
         display_title = f"{track['artist']} - {track['title']}"
         self.update_display_signal.emit(f"LOADING: {display_title[:20]}...")
@@ -364,7 +370,7 @@ class CavemanPlayer(QWidget):
         threading.Thread(target=fetch_and_play, daemon=True).start()
 
     def _apply_album_tracks(self, tracks):
-        self.queue_window.clear_all_items()
+        self.queue.clear()
         for track in tracks:
             self.queue.append(track)
         if not self.queue: return
@@ -454,14 +460,12 @@ class CavemanPlayer(QWidget):
         artist = last_track['artist']
         
         if not self.is_autoplay_mode:
-            # Show Autoplay Modal
             modal = AutoplayModal(self, artist, parent=self)
-            # Position modal centered near main window
             modal.move(self.pos().x() + 35, self.pos().y() + 20)
             modal.exec()
             
             if modal.result_action == "loop":
-                self.repeat_mode = 2 # Repeat All
+                self.repeat_mode = 2
                 self.btn_repeat.setText("↻A")
                 self.btn_repeat.setStyleSheet("color: #fff; background-color: #004400;")
                 self.current_queue_idx = 0
@@ -473,19 +477,36 @@ class CavemanPlayer(QWidget):
             else:
                 return
             
-        self.update_display_signal.emit(f"AUTOPLAY: {artist}...")
+        self.update_display_signal.emit(f"AUTOPLAY: {artist[:15]}...")
         
         def fetch_related():
-            results = self.itunes.get_related_tracks(artist, limit=5)
-            if results:
-                recent_ids = {t['id'] for t in self.queue[-10:]}
-                new_tracks = [t for t in results if t['id'] not in recent_ids]
-                if not new_tracks: new_tracks = results
+            exclude_list = list(self.session_played_ids)
+            
+            # Step 1: Local DB Recommendations
+            local_recs = self.db.get_smart_recommendations(artist, exclude_list, limit=10)
+            
+            # Step 2: Anti-Stutter Fallback (Drop oldest 50%)
+            if not local_recs and len(self.session_played_ids) > 10:
+                for _ in range(len(self.session_played_ids) // 2):
+                    self.session_played_ids.popleft()
+                exclude_list = list(self.session_played_ids)
+                local_recs = self.db.get_smart_recommendations(artist, exclude_list, limit=10)
                 
+            if local_recs:
+                next_track = local_recs[0]
+                self.autoplay_track_signal.emit(next_track)
+                return
+                
+            # Step 3: iTunes API Fallback
+            results = self.itunes.get_related_tracks(artist, limit=10)
+            if results:
+                new_tracks = [t for t in results if t['id'] not in exclude_list]
+                if not new_tracks: new_tracks = results
                 next_track = new_tracks[0]
                 self.autoplay_track_signal.emit(next_track)
             else:
                 self.update_display_signal.emit("AUTOPLAY FAILED")
+                
         threading.Thread(target=fetch_related, daemon=True).start()
 
     def _on_autoplay_track(self, next_track):
