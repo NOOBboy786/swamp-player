@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+caveman.db
+app/bin/
+app/assets/thumbnails/
+app/assets/art/
