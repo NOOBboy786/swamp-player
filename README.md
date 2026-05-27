@@ -10,12 +10,12 @@ A retro-styled desktop music player with a Winamp aesthetic.(vibecoded) Swamp Pl
 - **playlists:** You can drag and drop links and it will show the playlist content in a nutshell import online playlist
 
 - ## Features that dont work yet
-- **album** still doesnt work
+- ~~**album** still doesnt work~~ works on the latest version :D
 - **playback** can automatically stop sometimes
-- **autoplay** can bug out or crash the app fully
+- ~~**autoplay** can bug out or crash the app fully~~ buggy but doesnt crash :DDD
 
 ## Features that i wanna add
-- **lyrics** Shows song lyrics
+- **lyrics** Shows song lyrics --working on it 
 - **more optimization** sudden spikes in cpu and mem usage
 
 ## How to Compile / Run from Source
