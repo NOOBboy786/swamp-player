@@ -4,7 +4,7 @@ import collections
 import requests
 from PySide6.QtWidgets import QWidget, QLabel, QDialog
 from PySide6.QtGui import QPainter, QMouseEvent, QPixmap, QImage, QColor, QIcon
-from PySide6.QtCore import Qt, QPoint, Signal
+from PySide6.QtCore import Qt, QPoint, Signal, QEvent
 
 from app.ui.widgets import RetroButton, RetroDisplayLabel, RetroSlider
 from app.backend.mpv_controller import MPVController
@@ -26,6 +26,7 @@ class CavemanPlayer(QWidget):
     update_art_signal = Signal(bytes)
     autoplay_track_signal = Signal(dict)
     apply_album_tracks_signal = Signal(list)
+    update_lyrics_time_signal = Signal(float)
     
     def __init__(self, base_dir):
         super().__init__()
@@ -94,6 +95,12 @@ class CavemanPlayer(QWidget):
         self.playlist_contents_window = PlaylistAndContentsWindow(self)
         self.history_window = HistoryWindow(self)
         
+        from app.ui.windows.lyrics_window import LyricsWindow
+        self.lyrics_window = LyricsWindow(self)
+        
+        from app.ui.windows.mini_player import MiniPlayerWindow
+        self.mini_player_window = MiniPlayerWindow(self)
+        
         self.queue_window = self.search_queue_window
         
         self._load_window_positions()
@@ -119,6 +126,7 @@ class CavemanPlayer(QWidget):
             if not pos_config.get('search_visible', True): self.search_queue_window.hide()
             if pos_config.get('playlist_contents_visible', False): self.playlist_contents_window.show()
             if pos_config.get('history_visible', False): self.history_window.show()
+            if pos_config.get('lyrics_visible', False): self.lyrics_window.show()
         else:
             # Default Layout
             self.search_queue_window.show()
@@ -191,19 +199,23 @@ class CavemanPlayer(QWidget):
         self.btn_repeat.clicked.connect(self._toggle_repeat)
         
         self.btn_search = RetroButton("🔍", self)
-        self.btn_search.setGeometry(190, 115, 25, 25)
+        self.btn_search.setGeometry(185, 115, 25, 25)
         self.btn_search.clicked.connect(self._toggle_search_window)
         
         self.btn_pl = RetroButton("♫", self)
-        self.btn_pl.setGeometry(220, 115, 25, 25)
+        self.btn_pl.setGeometry(210, 115, 25, 25)
         self.btn_pl.clicked.connect(self._toggle_playlist_window)
         
         self.btn_hist = RetroButton("🕘", self)
-        self.btn_hist.setGeometry(250, 115, 25, 25)
+        self.btn_hist.setGeometry(235, 115, 25, 25)
         self.btn_hist.clicked.connect(self._toggle_history_window)
         
+        self.btn_lyrics = RetroButton("📝", self)
+        self.btn_lyrics.setGeometry(260, 115, 25, 25)
+        self.btn_lyrics.clicked.connect(self._toggle_lyrics_window)
+        
         self.vol_slider = RetroSlider(self)
-        self.vol_slider.setGeometry(280, 120, 60, 15)
+        self.vol_slider.setGeometry(285, 120, 60, 15)
         self.vol_slider.setMaximum(100)
         self.vol_slider.setValue(50)
         self.vol_slider.valueChanged.connect(self.mpv.set_volume)
@@ -234,6 +246,14 @@ class CavemanPlayer(QWidget):
         super().hideEvent(event)
         if hasattr(self, 'trigger_save_layout'): self.trigger_save_layout()
 
+    def changeEvent(self, event):
+        if event.type() == QEvent.WindowStateChange:
+            if self.isMinimized():
+                self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
+                self.hide()
+                self.mini_player_window.show_and_snap()
+        super().changeEvent(event)
+
     def _toggle_repeat(self):
         self.repeat_mode = (self.repeat_mode + 1) % 3
         modes = ["↻", "↻1", "↻A"]
@@ -255,15 +275,25 @@ class CavemanPlayer(QWidget):
         if self.history_window.isVisible(): self.history_window.hide()
         else: self.history_window.show()
 
+    def _toggle_lyrics_window(self):
+        if self.lyrics_window.isVisible(): self.lyrics_window.hide()
+        else: self.lyrics_window.show()
+
     def _toggle_pin(self):
         self.is_pinned = not self.is_pinned
+        app = QApplication.instance()
+        
+        for w in app.topLevelWidgets():
+            if self.is_pinned:
+                w.setWindowFlags(w.windowFlags() | Qt.WindowStaysOnTopHint)
+            else:
+                w.setWindowFlags(w.windowFlags() & ~Qt.WindowStaysOnTopHint)
+            w.show()
+            
         if self.is_pinned:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
             self.btn_pin.setStyleSheet("color: #fff; background-color: #004400;")
         else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
             self.btn_pin.setStyleSheet("")
-        self.show()
 
     def _open_settings(self):
         from app.ui.windows.settings_window import SettingsModal
@@ -315,6 +345,7 @@ class CavemanPlayer(QWidget):
             self.search_queue_window.update()
             self.history_window.update()
             self.playlist_contents_window.update()
+            self.lyrics_window.update()
 
     def load_and_play(self, track):
         if not getattr(self, 'current_track', None) or self.current_track.get('id') != track.get('id'):
@@ -331,6 +362,9 @@ class CavemanPlayer(QWidget):
         self.seek_bar.setValue(0)
         self.lbl_art.setText("...")
         self.lbl_art.setPixmap(QPixmap())
+        
+        if hasattr(self, 'lyrics_window'):
+            self.lyrics_window._check_for_new_track()
         
         if self.smtc:
             self.smtc.update_metadata(track)
@@ -528,10 +562,12 @@ class CavemanPlayer(QWidget):
         mins, secs = divmod(int(value), 60)
         self.lbl_duration.setText(f"{mins:02d}:{secs:02d}")
 
-    def _update_time(self, value):
+    def _update_time(self, time_pos):
+        if not time_pos: return
         if not self.seek_bar.is_dragging:
-            self.seek_bar.setValue(int(value))
-        mins, secs = divmod(int(value), 60)
+            self.seek_bar.setValue(int(time_pos))
+        self.update_lyrics_time_signal.emit(time_pos)
+        mins, secs = divmod(int(time_pos), 60)
         self.lbl_time.setText(f"{mins:02d}:{secs:02d}")
         
     def _on_seek(self, value):
@@ -549,14 +585,17 @@ class CavemanPlayer(QWidget):
             'search': [self.search_queue_window.pos().x(), self.search_queue_window.pos().y()],
             'playlist_contents': [self.playlist_contents_window.pos().x(), self.playlist_contents_window.pos().y()],
             'history': [self.history_window.pos().x(), self.history_window.pos().y()],
+            'lyrics': [self.lyrics_window.pos().x(), self.lyrics_window.pos().y()],
             
             'search_size': [self.search_queue_window.width(), self.search_queue_window.height()],
             'playlist_contents_size': [self.playlist_contents_window.width(), self.playlist_contents_window.height()],
             'history_size': [self.history_window.width(), self.history_window.height()],
+            'lyrics_size': [self.lyrics_window.width(), self.lyrics_window.height()],
             
             'search_visible': self.search_queue_window.isVisible(),
             'playlist_contents_visible': self.playlist_contents_window.isVisible(),
-            'history_visible': self.history_window.isVisible()
+            'history_visible': self.history_window.isVisible(),
+            'lyrics_visible': self.lyrics_window.isVisible()
         })
 
     def closeEvent(self, event):
@@ -572,6 +611,7 @@ class CavemanPlayer(QWidget):
         self.search_queue_window.close()
         self.playlist_contents_window.close()
         self.history_window.close()
+        self.lyrics_window.close()
         event.accept()
         
         import sys
